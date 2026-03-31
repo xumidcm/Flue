@@ -1,8 +1,11 @@
 package com.flue.launcher
 
 import android.app.Application
+import android.app.Activity.RESULT_OK
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -10,8 +13,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
 import com.flue.launcher.ui.home.BuiltInWatchFacePreview
 import com.flue.launcher.ui.home.FIXED_PREVIEW_CLOCK
 import com.flue.launcher.ui.theme.WatchColors
@@ -157,6 +164,35 @@ private fun InternalWatchFaceConfigScreen(
                 }
             }
         }
+    }
+    var pendingInternalPickerMode by remember { mutableStateOf<String?>(null) }
+    val internalPickerLauncher = rememberLauncherForActivityResult(StartActivityForResult()) { result ->
+        val pickedUri = result.data?.data ?: result.data?.getStringExtra("picked_uri")?.let(Uri::parse)
+        if (result.resultCode == RESULT_OK && pickedUri != null) {
+            val savedPath = handlePickedMedia(
+                application = vm.getApplication(),
+                watchFaceId = watchFaceId,
+                sourceUri = pickedUri,
+                onMessage = { message ->
+                    Toast.makeText(vm.getApplication(), message, Toast.LENGTH_SHORT).show()
+                }
+            )
+            if (!savedPath.isNullOrBlank()) {
+                localPath = savedPath
+                if (isPhoto) vm.setBuiltInPhotoPath(savedPath) else vm.setBuiltInVideoPath(savedPath)
+            }
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(RequestMultiplePermissions()) { result ->
+        val allGranted = result.values.all { it }
+        if (!allGranted) {
+            Toast.makeText(vm.getApplication(), "需要存储权限才能使用内置文件管理器", Toast.LENGTH_SHORT).show()
+            pendingInternalPickerMode = null
+            return@rememberLauncherForActivityResult
+        }
+        val mode = pendingInternalPickerMode ?: return@rememberLauncherForActivityResult
+        internalPickerLauncher.launch(Intent(vm.getApplication(), InternalMediaPickerActivity::class.java).putExtra(EXTRA_PICKER_MODE, mode))
+        pendingInternalPickerMode = null
     }
 
     BackHandler {
@@ -297,6 +333,23 @@ private fun InternalWatchFaceConfigScreen(
                 if (isPhoto) "\u9009\u62E9\u56FE\u7247" else "\u9009\u62E9\u89C6\u9891"
             } else {
                 if (isPhoto) "\u66F4\u6362\u56FE\u7247" else "\u66F4\u6362\u89C6\u9891"
+            },
+            onLongClick = {
+                val mode = if (isPhoto) PICKER_MODE_IMAGE else PICKER_MODE_VIDEO
+                val requiredPermissions = mediaPermissions(isPhoto)
+                val app = vm.getApplication<Application>()
+                val denied = requiredPermissions.filter {
+                    ContextCompat.checkSelfPermission(app, it) != PackageManager.PERMISSION_GRANTED
+                }
+                if (denied.isEmpty()) {
+                    internalPickerLauncher.launch(
+                        Intent(app, InternalMediaPickerActivity::class.java)
+                            .putExtra(EXTRA_PICKER_MODE, mode)
+                    )
+                } else {
+                    pendingInternalPickerMode = mode
+                    permissionLauncher.launch(denied.toTypedArray())
+                }
             }
         ) {
             picker.launch(arrayOf(if (isPhoto) "image/*" else "video/*"))
@@ -329,6 +382,7 @@ private fun InternalWatchFaceConfigScreen(
 private fun ActionButton(
     text: String,
     enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Box(
@@ -336,7 +390,11 @@ private fun ActionButton(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(if (enabled) WatchColors.SurfaceGlass else Color.White.copy(alpha = 0.05f))
-            .clickable(enabled = enabled, onClick = onClick)
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -346,6 +404,14 @@ private fun ActionButton(
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+private fun mediaPermissions(isPhoto: Boolean): Array<String> {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(if (isPhoto) android.Manifest.permission.READ_MEDIA_IMAGES else android.Manifest.permission.READ_MEDIA_VIDEO)
+    } else {
+        arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 }
 
