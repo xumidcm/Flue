@@ -66,6 +66,7 @@ fun HoneycombScreen(
     bottomBlurRadiusDp: Int = 12,
     topFadeRangeDp: Int = 56,
     bottomFadeRangeDp: Int = 56,
+    iconScaleFactor: Float = 1f,
     onAppClick: (AppInfo, Offset) -> Unit,
     onReorder: (Int, Int) -> Unit = { _, _ -> },
     onLongClick: (AppInfo) -> Unit = {},
@@ -106,9 +107,13 @@ fun HoneycombScreen(
 
         val maxCols = narrowCols + 1
         val availableWidth = screenWidthPx - with(density) { 20.dp.toPx() }
-        val iconSizePx = (availableWidth / (maxCols + 0.35f)).coerceIn(
+        val autoIconSizePx = (availableWidth / (maxCols + 0.35f)).coerceIn(
             with(density) { 54.dp.toPx() },
             with(density) { 84.dp.toPx() }
+        )
+        val iconSizePx = (autoIconSizePx * iconScaleFactor.coerceIn(0.7f, 1.4f)).coerceIn(
+            with(density) { 40.dp.toPx() },
+            with(density) { 120.dp.toPx() }
         )
         val iconSizeDp = with(density) { iconSizePx.toDp() }
         val cellSize = iconSizePx * 1.02f

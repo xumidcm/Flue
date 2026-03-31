@@ -69,6 +69,7 @@ fun LauncherSettingsSheet(
     honeycombBottomBlur: Int = 4,
     honeycombTopFade: Int = 56,
     honeycombBottomFade: Int = 56,
+    iconScalePercent: Int = 100,
     showNotification: Boolean = true,
     watchFaces: List<LunchWatchFaceDescriptor> = emptyList(),
     selectedWatchFaceId: String = "",
@@ -87,6 +88,7 @@ fun LauncherSettingsSheet(
     onHoneycombBottomBlurChange: (Int) -> Unit = {},
     onHoneycombTopFadeChange: (Int) -> Unit = {},
     onHoneycombBottomFadeChange: (Int) -> Unit = {},
+    onIconScalePercentChange: (Int) -> Unit = {},
     onShowNotificationChange: (Boolean) -> Unit = {},
     onWatchFaceSelect: (String) -> Unit = {},
     onOpenWatchFaceSettings: (LunchWatchFaceDescriptor) -> Unit = {},
@@ -211,6 +213,22 @@ fun LauncherSettingsSheet(
             item("layout_list") {
                 val scale = itemFisheye(listState.layoutInfo.visibleItemsInfo.find { it.key == "layout_list" }, screenCenterY, screenHeightPx)
                 SettingOption(tr(isZh, "列表布局", "List"), tr(isZh, "纵向应用列表", "Vertical app list"), currentLayout == LayoutMode.List, { onLayoutChange(LayoutMode.List) }, scale)
+            }
+            item("icon_scale") {
+                val scale = itemFisheye(listState.layoutInfo.visibleItemsInfo.find { it.key == "icon_scale" }, screenCenterY, screenHeightPx)
+                DeferredSliderCard(
+                    label = tr(isZh, "图标大小", "Icon Size"),
+                    valueText = tr(
+                        isZh,
+                        "自动 × ${iconScalePercent}%",
+                        "Auto × ${iconScalePercent}%"
+                    ),
+                    value = iconScalePercent.toFloat(),
+                    valueRange = 70f..140f,
+                    steps = 13,
+                    scale = scale,
+                    onValueCommitted = { onIconScalePercentChange(it.toInt()) }
+                )
             }
 
             item("effects_header") { ScaledSectionHeader(tr(isZh, "效果", "Effects"), listState, "effects_header", screenCenterY, screenHeightPx) }

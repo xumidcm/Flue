@@ -87,6 +87,7 @@ fun ListDrawerScreen(
     edgeBlurEnabled: Boolean = false,
     suppressHeavyEffects: Boolean = false,
     iconSize: Dp = 48.dp,
+    iconScaleFactor: Float = 1f,
     onAppClick: (AppInfo, Offset) -> Unit,
     onReorder: (Int, Int) -> Unit = { _, _ -> },
     onLongClick: (AppInfo) -> Unit = {},
@@ -99,6 +100,9 @@ fun ListDrawerScreen(
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val effectiveEdgeBlur = edgeBlurEnabled && !suppressHeavyEffects
+    val finalIconSize = (iconSize * iconScaleFactor.coerceIn(0.7f, 1.4f)).coerceIn(34.dp, 88.dp)
+    val labelFontSize = (finalIconSize.value * 0.33f).coerceIn(13f, 22f).sp
+    val iconLabelSpacing = (finalIconSize * 0.28f).coerceIn(10.dp, 20.dp)
 
     var longPressedApp by remember { mutableStateOf<AppInfo?>(null) }
     val itemCenters = remember { mutableMapOf<Int, Float>() }
@@ -206,7 +210,7 @@ fun ListDrawerScreen(
                     awaitEachGesture {
                         val releaseScreenHeightPx = size.height.toFloat()
                         val releaseOverlayHeightPx = dragFromIndex?.let { itemHeights[it] }
-                            ?: with(density) { (iconSize + 20.dp).toPx() }
+                            ?: with(density) { (finalIconSize + 20.dp).toPx() }
                         val down = awaitPrimaryDown()
                         val startIndex = findNearestListIndex(
                             pointerY = down.position.y,
@@ -321,10 +325,10 @@ fun ListDrawerScreen(
             val autoScrollEdgePx = with(density) { LIST_AUTO_SCROLL_EDGE_DP.dp.toPx() }
             val topEdgeBlurZonePx = with(density) { 72.dp.toPx() }
             val bottomEdgeBlurZonePx = with(density) { 78.dp.toPx() }
-            val estimatedItemHeight = iconSize.coerceAtLeast(48.dp) + 20.dp
+            val estimatedItemHeight = finalIconSize.coerceAtLeast(48.dp) + 20.dp
             val centeredPadding = 8.dp
             val dragRowShift = dragFromIndex?.let { itemHeights[it] } ?: with(density) { estimatedItemHeight.toPx() }
-            val dragOverlayHeightPx = dragFromIndex?.let { itemHeights[it] } ?: with(density) { (iconSize + 20.dp).toPx() }
+            val dragOverlayHeightPx = dragFromIndex?.let { itemHeights[it] } ?: with(density) { (finalIconSize + 20.dp).toPx() }
 
             LaunchedEffect(dragFromIndex, screenHeightPx) {
                 var previousFrameNanos = 0L
@@ -473,14 +477,14 @@ fun ListDrawerScreen(
                             bitmap = displayIcon,
                             contentDescription = app.label,
                             modifier = Modifier
-                                .size(iconSize)
+                                .size(finalIconSize)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(iconLabelSpacing))
                         Text(
                             text = app.label,
-                            fontSize = 16.sp,
+                            fontSize = labelFontSize,
                             fontWeight = FontWeight.W500,
                             color = Color.White
                         )
@@ -534,14 +538,14 @@ fun ListDrawerScreen(
                         },
                         contentDescription = draggedApp.label,
                         modifier = Modifier
-                            .size(iconSize)
+                            .size(finalIconSize)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(iconLabelSpacing))
                     Text(
                         text = draggedApp.label,
-                        fontSize = 16.sp,
+                        fontSize = labelFontSize,
                         fontWeight = FontWeight.W500,
                         color = Color.White
                     )
