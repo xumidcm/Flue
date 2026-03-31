@@ -69,6 +69,7 @@ fun LauncherSettingsSheet(
     honeycombBottomBlur: Int = 4,
     honeycombTopFade: Int = 56,
     honeycombBottomFade: Int = 56,
+    roundScreenMode: Boolean = false,
     showNotification: Boolean = true,
     watchFaces: List<LunchWatchFaceDescriptor> = emptyList(),
     selectedWatchFaceId: String = "",
@@ -87,6 +88,7 @@ fun LauncherSettingsSheet(
     onHoneycombBottomBlurChange: (Int) -> Unit = {},
     onHoneycombTopFadeChange: (Int) -> Unit = {},
     onHoneycombBottomFadeChange: (Int) -> Unit = {},
+    onRoundScreenModeToggle: (Boolean) -> Unit = {},
     onShowNotificationChange: (Boolean) -> Unit = {},
     onWatchFaceSelect: (String) -> Unit = {},
     onOpenWatchFaceSettings: (LunchWatchFaceDescriptor) -> Unit = {},
@@ -214,6 +216,16 @@ fun LauncherSettingsSheet(
             }
 
             item("effects_header") { ScaledSectionHeader(tr(isZh, "效果", "Effects"), listState, "effects_header", screenCenterY, screenHeightPx) }
+            item("round_mode_toggle") {
+                val scale = itemFisheye(listState.layoutInfo.visibleItemsInfo.find { it.key == "round_mode_toggle" }, screenCenterY, screenHeightPx)
+                SettingToggle(
+                    tr(isZh, "圆屏适配", "Round Screen Mode"),
+                    tr(isZh, "开启后优化圆屏间距与边缘布局", "Optimize spacing and edges for round watches"),
+                    roundScreenMode,
+                    onRoundScreenModeToggle,
+                    scale = scale
+                )
+            }
             item("blur_toggle") {
                 val scale = itemFisheye(listState.layoutInfo.visibleItemsInfo.find { it.key == "blur_toggle" }, screenCenterY, screenHeightPx)
                 SettingToggle(tr(isZh, "模糊", "Blur"), tr(isZh, "在支持的 Android 版本上启用模糊", "Enable blur on supported Android versions"), blurEnabled, onBlurToggle, scale = scale)

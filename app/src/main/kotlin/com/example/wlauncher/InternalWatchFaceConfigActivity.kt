@@ -90,6 +90,7 @@ private fun InternalWatchFaceConfigScreen(
     val photoClockBold by vm.builtInPhotoClockBold.collectAsState()
     val videoClockBold by vm.builtInVideoClockBold.collectAsState()
     val videoFillScreen by vm.builtInVideoFillScreen.collectAsState()
+    val roundScreenMode by vm.roundScreenMode.collectAsState()
     val isPhoto = watchFaceId == BUILT_IN_PHOTO_WATCHFACE_ID
     val currentPath = if (isPhoto) photoPath else videoPath
     val activeClockPosition = if (isPhoto) photoClockPosition else videoClockPosition
@@ -185,7 +186,10 @@ private fun InternalWatchFaceConfigScreen(
             .fillMaxSize()
             .background(Color.Black)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 22.dp),
+            .padding(
+                horizontal = if (roundScreenMode) 24.dp else 18.dp,
+                vertical = if (roundScreenMode) 18.dp else 22.dp
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -200,7 +204,7 @@ private fun InternalWatchFaceConfigScreen(
             color = WatchColors.TextTertiary,
             fontSize = 13.sp
         )
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(if (roundScreenMode) 26.dp else 22.dp))
 
         Box(
             modifier = Modifier
@@ -232,7 +236,7 @@ private fun InternalWatchFaceConfigScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(if (roundScreenMode) 18.dp else 22.dp))
 
         Text(
             text = "\u65F6\u95F4\u4F4D\u7F6E",

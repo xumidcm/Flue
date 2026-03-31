@@ -149,6 +149,7 @@ fun LauncherScreen(vm: LauncherViewModel) {
     val builtInPhotoClockBold by vm.builtInPhotoClockBold.collectAsState()
     val builtInVideoClockBold by vm.builtInVideoClockBold.collectAsState()
     val builtInVideoFillScreen by vm.builtInVideoFillScreen.collectAsState()
+    val roundScreenMode by vm.roundScreenMode.collectAsState()
     val layerBlurEnabled = blurEnabled && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || screenState != ScreenState.App)
     val reduceLegacyDrawerEffects = Build.VERSION.SDK_INT < Build.VERSION_CODES.S && screenState == ScreenState.App
     val notificationsEnabled = false
@@ -278,6 +279,7 @@ fun LauncherScreen(vm: LauncherViewModel) {
                 when (layoutMode) {
                     LayoutMode.Honeycomb -> HoneycombScreen(
                         apps = apps,
+                        roundScreenMode = roundScreenMode,
                         blurEnabled = blurEnabled,
                         edgeBlurEnabled = edgeBlurEnabled,
                         suppressHeavyEffects = reduceLegacyDrawerEffects,
@@ -295,6 +297,7 @@ fun LauncherScreen(vm: LauncherViewModel) {
                     )
                     LayoutMode.List -> ListDrawerScreen(
                         apps = apps,
+                        roundScreenMode = roundScreenMode,
                         blurEnabled = blurEnabled,
                         edgeBlurEnabled = edgeBlurEnabled,
                         suppressHeavyEffects = reduceLegacyDrawerEffects,
@@ -407,6 +410,8 @@ fun LauncherScreen(vm: LauncherViewModel) {
                     onHoneycombBottomBlurChange = { vm.setHoneycombBottomBlur(it) },
                     onHoneycombTopFadeChange = { vm.setHoneycombTopFade(it) },
                     onHoneycombBottomFadeChange = { vm.setHoneycombBottomFade(it) },
+                    roundScreenMode = roundScreenMode,
+                    onRoundScreenModeToggle = { vm.setRoundScreenMode(it) },
                     onShowNotificationChange = { vm.setShowNotification(it) },
                     onWatchFaceSelect = { vm.selectWatchFace(it) },
                     onOpenWatchFaceSettings = { descriptor ->

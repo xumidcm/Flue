@@ -58,6 +58,7 @@ private const val HONEYCOMB_AUTO_SCROLL_MAX_PX = 26f
 @Composable
 fun HoneycombScreen(
     apps: List<AppInfo>,
+    roundScreenMode: Boolean = false,
     blurEnabled: Boolean = true,
     edgeBlurEnabled: Boolean = false,
     suppressHeavyEffects: Boolean = false,
@@ -105,7 +106,9 @@ fun HoneycombScreen(
         val screenRadius = minOf(screenWidthPx, screenHeightPx) / 2f
 
         val maxCols = narrowCols + 1
-        val availableWidth = screenWidthPx - with(density) { 20.dp.toPx() }
+        val availableWidth = screenWidthPx - with(density) {
+            if (roundScreenMode) 34.dp.toPx() else 20.dp.toPx()
+        }
         val iconSizePx = (availableWidth / (maxCols + 0.35f)).coerceIn(
             with(density) { 54.dp.toPx() },
             with(density) { 84.dp.toPx() }
@@ -115,8 +118,14 @@ fun HoneycombScreen(
         val topFadePx = with(density) { topFadeRangeDp.dp.toPx() }
         val bottomFadePx = with(density) { bottomFadeRangeDp.dp.toPx() }
 
-        val positions = remember(apps.size, narrowCols, cellSize) {
-            generateHoneycombRows(apps.size, narrowCols, cellSize)
+        val positions = remember(apps.size, narrowCols, cellSize, roundScreenMode) {
+            generateHoneycombRows(apps.size, narrowCols, cellSize).map { point ->
+                if (!roundScreenMode) {
+                    point
+                } else {
+                    point.copy(y = remapRoundHoneycombY(point.y, cellSize))
+                }
+            }
         }
 
         val minGridY = positions.minOfOrNull { it.y } ?: 0f
@@ -813,6 +822,15 @@ private fun honeycombVisualSlotIndex(
         dragCurrentIndex < dragFromIndex && index in dragCurrentIndex until dragFromIndex -> index + 1
         else -> index
     }
+}
+
+private fun remapRoundHoneycombY(y: Float, cellSize: Float): Float {
+    val normalized = (y / (cellSize * 7.5f)).coerceIn(-1.2f, 1.2f)
+    val spacingFactor = when {
+        normalized >= 0f -> 1.08f - 0.18f * normalized
+        else -> 1.08f + 0.10f * normalized
+    }.coerceIn(0.88f, 1.1f)
+    return y * spacingFactor
 }
 
 private data class HoneycombNeighborMotion(

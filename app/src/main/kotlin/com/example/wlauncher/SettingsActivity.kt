@@ -55,6 +55,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
@@ -65,6 +66,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -103,6 +105,7 @@ import java.util.Date
 import java.util.Locale
 
 private const val ABOUT_VERSION = "beta0.6"
+private val LocalDisableBottomFlatten = staticCompositionLocalOf { false }
 
 enum class SettingsDestination {
     ROOT,
@@ -164,6 +167,7 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
     val builtInPhotoClockBold by vm.builtInPhotoClockBold.collectAsState()
     val builtInVideoClockBold by vm.builtInVideoClockBold.collectAsState()
     val builtInVideoFillScreen by vm.builtInVideoFillScreen.collectAsState()
+    val roundScreenMode by vm.roundScreenMode.collectAsState()
     val headerTime = rememberSettingsHeaderTime()
 
     var destination by remember { mutableStateOf(SettingsDestination.ROOT) }
@@ -225,7 +229,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
                 headerTime = headerTime,
                 initialFirstVisibleItemIndex = scrollFor(SettingsDestination.ROOT).index,
                 initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.ROOT).offset,
-                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ROOT, index, offset) }
+                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ROOT, index, offset) },
+                roundScreenMode = roundScreenMode
             ) { listState, screenCenterY, screenHeightPx, _ ->
                 item("watchfaces") {
                     SettingsCategoryCard(
@@ -291,7 +296,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
                 headerTime = headerTime,
                 initialFirstVisibleItemIndex = scrollFor(SettingsDestination.HIDDEN_APPS).index,
                 initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.HIDDEN_APPS).offset,
-                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.HIDDEN_APPS, index, offset) }
+                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.HIDDEN_APPS, index, offset) },
+                roundScreenMode = roundScreenMode
             ) { listState, screenCenterY, screenHeightPx, visibleItemKeys ->
                 item("hidden_summary") {
                     MessageCard(
@@ -324,7 +330,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
                 headerTime = headerTime,
                 initialFirstVisibleItemIndex = scrollFor(SettingsDestination.ICON_PACKS).index,
                 initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.ICON_PACKS).offset,
-                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ICON_PACKS, index, offset) }
+                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ICON_PACKS, index, offset) },
+                roundScreenMode = roundScreenMode
             ) { listState, screenCenterY, screenHeightPx, _ ->
                 item("icon_pack_default") {
                     SettingsChoiceRow(
@@ -361,7 +368,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
             headerTime = headerTime,
             initialFirstVisibleItemIndex = scrollFor(SettingsDestination.WATCH_FACES).index,
             initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.WATCH_FACES).offset,
-            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.WATCH_FACES, index, offset) }
+            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.WATCH_FACES, index, offset) },
+            roundScreenMode = roundScreenMode
         ) { listState, screenCenterY, screenHeightPx, _ ->
             if (!watchFaceLastError.isNullOrBlank()) {
                 item("watchface_error") {
@@ -427,7 +435,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
             headerTime = headerTime,
             initialFirstVisibleItemIndex = scrollFor(SettingsDestination.APPEARANCE).index,
             initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.APPEARANCE).offset,
-            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.APPEARANCE, index, offset) }
+            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.APPEARANCE, index, offset) },
+            roundScreenMode = roundScreenMode
         ) { listState, screenCenterY, screenHeightPx, _ ->
             item("layout_header") { SectionTitle("\u5e03\u5c40", itemFisheye(listState, "layout_header", screenCenterY, screenHeightPx)) }
             item("layout_honeycomb") {
@@ -449,6 +458,15 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
                 )
             }
             item("visual_header") { SectionTitle("\u89c6\u89c9", itemFisheye(listState, "visual_header", screenCenterY, screenHeightPx)) }
+            item("round_screen_mode") {
+                SettingsSwitchRow(
+                    title = "\u5706\u5c4f\u9002\u914d",
+                    subtitle = "\u4e2d\u95f4\u66f4\u758f\uff0c\u5e95\u90e8\u66f4\u7d27\u51d1\uff0c\u5173\u95ed\u5e95\u90e8\u5e73\u94fa\u8fc7\u6e21",
+                    checked = roundScreenMode,
+                    onToggle = { vm.setRoundScreenMode(it) },
+                    scale = itemFisheye(listState, "round_screen_mode", screenCenterY, screenHeightPx)
+                )
+            }
             item("blur_enabled") {
                 SettingsSwitchRow(
                     title = "\u80cc\u666f\u6a21\u7cca",
@@ -556,7 +574,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
             headerTime = headerTime,
             initialFirstVisibleItemIndex = scrollFor(SettingsDestination.PERFORMANCE).index,
             initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.PERFORMANCE).offset,
-            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.PERFORMANCE, index, offset) }
+            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.PERFORMANCE, index, offset) },
+            roundScreenMode = roundScreenMode
         ) { listState, screenCenterY, screenHeightPx, _ ->
             item("low_res") {
                 SettingsSwitchRow(
@@ -584,7 +603,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
             headerTime = headerTime,
             initialFirstVisibleItemIndex = scrollFor(SettingsDestination.TOOLS).index,
             initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.TOOLS).offset,
-            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.TOOLS, index, offset) }
+            onScrollChanged = { index, offset -> updateScroll(SettingsDestination.TOOLS, index, offset) },
+            roundScreenMode = roundScreenMode
         ) { listState, screenCenterY, screenHeightPx, _ ->
             item("export_log") {
                 ActionCard(
@@ -610,7 +630,8 @@ private fun SettingsRootScreen(onFinish: () -> Unit) {
                 headerTime = headerTime,
                 initialFirstVisibleItemIndex = scrollFor(SettingsDestination.ABOUT).index,
                 initialFirstVisibleItemScrollOffset = scrollFor(SettingsDestination.ABOUT).offset,
-                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ABOUT, index, offset) }
+                onScrollChanged = { index, offset -> updateScroll(SettingsDestination.ABOUT, index, offset) },
+                roundScreenMode = roundScreenMode
             ) { listState, screenCenterY, screenHeightPx, _ ->
                 item("about_card") {
                     AboutCard(
@@ -630,6 +651,7 @@ private fun SettingsPageScaffold(
     initialFirstVisibleItemIndex: Int = 0,
     initialFirstVisibleItemScrollOffset: Int = 0,
     onScrollChanged: (Int, Int) -> Unit = { _, _ -> },
+    roundScreenMode: Boolean = false,
     content: LazyListScope.(LazyListState, Float, Float, Set<Any>) -> Unit
 ) {
     val listState = rememberLazyListState(
@@ -696,43 +718,48 @@ private fun SettingsPageScaffold(
         val screenHeightPx = constraints.maxHeight.toFloat()
         val screenCenterY = screenHeightPx / 2f
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(nestedScrollConnection)
-                .graphicsLayer { translationY = overscroll.value }
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            contentPadding = PaddingValues(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    HeaderBackButton(onClick = onBack)
+        CompositionLocalProvider(LocalDisableBottomFlatten provides roundScreenMode) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection)
+                    .graphicsLayer { translationY = overscroll.value }
+                    .padding(
+                        horizontal = if (roundScreenMode) 18.dp else 16.dp,
+                        vertical = if (roundScreenMode) 16.dp else 18.dp
+                    ),
+                contentPadding = PaddingValues(bottom = if (roundScreenMode) 12.dp else 28.dp),
+                verticalArrangement = Arrangement.spacedBy(if (roundScreenMode) 12.dp else 10.dp)
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        HeaderBackButton(onClick = onBack)
+                        Text(
+                            text = headerTime,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                item {
                     Text(
-                        text = headerTime,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = title,
+                        color = WatchColors.ActiveCyan,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
+                content(listState, screenCenterY, screenHeightPx, visibleItemKeys)
             }
-            item {
-                Text(
-                    text = title,
-                    color = WatchColors.ActiveCyan,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-            content(listState, screenCenterY, screenHeightPx, visibleItemKeys)
         }
     }
 }
@@ -1164,6 +1191,7 @@ private fun itemFisheye(
     screenCenterY: Float,
     screenHeight: Float
 ): Float {
+    val disableBottomFlatten = LocalDisableBottomFlatten.current
     val layoutInfo = listState.layoutInfo
     val info = layoutInfo.visibleItemsInfo.find { it.key == key } ?: return 0.92f
     val itemCenterY = info.offset + info.size / 2f
@@ -1186,7 +1214,11 @@ private fun itemFisheye(
     } else {
         0f
     }
-    val rawFlattenProgress = (nearBottomProgress * 0.6f + edgeProgress * 0.4f).coerceIn(0f, 1f)
+    val rawFlattenProgress = if (disableBottomFlatten) {
+        0f
+    } else {
+        (nearBottomProgress * 0.6f + edgeProgress * 0.4f).coerceIn(0f, 1f)
+    }
     val flattenProgress by animateFloatAsState(
         targetValue = rawFlattenProgress,
         animationSpec = tween(durationMillis = 260),

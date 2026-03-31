@@ -83,6 +83,7 @@ private const val LIST_EDGE_ITEM_BLUR_DP = 4f
 @Composable
 fun ListDrawerScreen(
     apps: List<AppInfo>,
+    roundScreenMode: Boolean = false,
     blurEnabled: Boolean = true,
     edgeBlurEnabled: Boolean = false,
     suppressHeavyEffects: Boolean = false,
@@ -319,10 +320,10 @@ fun ListDrawerScreen(
             val screenHeightPx = with(density) { maxHeight.toPx() }
             val screenCenterY = screenHeightPx / 2f
             val autoScrollEdgePx = with(density) { LIST_AUTO_SCROLL_EDGE_DP.dp.toPx() }
-            val topEdgeBlurZonePx = with(density) { 72.dp.toPx() }
-            val bottomEdgeBlurZonePx = with(density) { 78.dp.toPx() }
+            val topEdgeBlurZonePx = with(density) { if (roundScreenMode) 78.dp.toPx() else 72.dp.toPx() }
+            val bottomEdgeBlurZonePx = with(density) { if (roundScreenMode) 66.dp.toPx() else 78.dp.toPx() }
             val estimatedItemHeight = iconSize.coerceAtLeast(48.dp) + 20.dp
-            val centeredPadding = 8.dp
+            val centeredPadding = if (roundScreenMode) 6.dp else 8.dp
             val dragRowShift = dragFromIndex?.let { itemHeights[it] } ?: with(density) { estimatedItemHeight.toPx() }
             val dragOverlayHeightPx = dragFromIndex?.let { itemHeights[it] } ?: with(density) { (iconSize + 20.dp).toPx() }
 
@@ -375,16 +376,16 @@ fun ListDrawerScreen(
                     .graphicsLayer { translationY = overscroll.value }
                     .background(Color.Black),
                 contentPadding = PaddingValues(
-                    top = centeredPadding,
-                    bottom = centeredPadding,
-                    start = 12.dp,
-                    end = 12.dp
+                    top = if (roundScreenMode) 12.dp else centeredPadding,
+                    bottom = if (roundScreenMode) 2.dp else centeredPadding,
+                    start = if (roundScreenMode) 18.dp else 12.dp,
+                    end = if (roundScreenMode) 18.dp else 12.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(if (roundScreenMode) 6.dp else 4.dp)
             ) {
                 itemsIndexed(apps, key = { _, app -> app.componentKey }) { index, app ->
                     val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == index }
-                    val itemScale = computeItemScale(itemInfo, screenCenterY, screenHeightPx)
+                    val itemScale = computeItemScale(itemInfo, screenCenterY, screenHeightPx, roundScreenMode)
                     val itemBlur = computeVerticalEdgeBlur(
                         centerY = itemInfo?.let { it.offset + it.size / 2f } ?: screenCenterY,
                         screenHeight = screenHeightPx,
@@ -659,14 +660,16 @@ private fun findNearestListIndex(
 private fun computeItemScale(
     itemInfo: androidx.compose.foundation.lazy.LazyListItemInfo?,
     screenCenterY: Float,
-    screenHeight: Float
+    screenHeight: Float,
+    roundScreenMode: Boolean
 ): Float {
     if (itemInfo == null) return 0.85f
     val itemCenterY = itemInfo.offset + itemInfo.size / 2f
     val dist = abs(itemCenterY - screenCenterY)
     val maxDist = screenHeight / 2f
     val t = (dist / maxDist).coerceIn(0f, 1f)
-    return 1f - 0.2f * t
+    val minScale = if (roundScreenMode) 0.84f else 0.8f
+    return 1f - (1f - minScale) * t
 }
 
 private fun computeVerticalEdgeBlur(
