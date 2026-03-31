@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,6 +92,10 @@ private fun InternalWatchFaceConfigScreen(
     val activeClockPosition = if (isPhoto) photoClockPosition else videoClockPosition
     val activeClockSize = if (isPhoto) photoClockSize else videoClockSize
     val activeClockBold = if (isPhoto) photoClockBold else videoClockBold
+    val configuration = LocalConfiguration.current
+    val watchScreenAspectRatio = remember(configuration.screenWidthDp, configuration.screenHeightDp) {
+        (configuration.screenWidthDp.toFloat() / configuration.screenHeightDp.toFloat()).coerceIn(0.7f, 1.4f)
+    }
     var localPath by remember(watchFaceId) { mutableStateOf(currentPath) }
     var localClockPosition by remember(watchFaceId) { mutableStateOf(activeClockPosition) }
     var localClockSize by remember(watchFaceId) { mutableFloatStateOf(activeClockSize.toFloat()) }
@@ -184,7 +189,7 @@ private fun InternalWatchFaceConfigScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .aspectRatio(watchScreenAspectRatio)
                 .clip(RoundedCornerShape(30.dp))
                 .background(Color(0xFF10141D)),
             contentAlignment = Alignment.Center
