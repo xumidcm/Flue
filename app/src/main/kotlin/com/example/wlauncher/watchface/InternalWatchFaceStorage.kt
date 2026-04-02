@@ -2,6 +2,7 @@ package com.flue.launcher.watchface
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import java.io.File
 
@@ -9,9 +10,9 @@ object InternalWatchFaceStorage {
     private const val PHOTO_DIR = "photo"
     private const val VIDEO_DIR = "video"
 
-    fun copyPhoto(context: Context, uri: Uri): String? = copyMedia(context, uri, PHOTO_DIR, "image")
+    fun copyPhoto(context: Context, uri: Uri): String? = copyMedia(context, uri, PHOTO_DIR, "jpg")
 
-    fun copyVideo(context: Context, uri: Uri): String? = copyMedia(context, uri, VIDEO_DIR, "video")
+    fun copyVideo(context: Context, uri: Uri): String? = copyMedia(context, uri, VIDEO_DIR, "mp4")
 
     fun clearPhoto(context: Context) = clearMedia(context, PHOTO_DIR)
 
@@ -42,6 +43,15 @@ object InternalWatchFaceStorage {
         val mimeType = context.contentResolver.getType(uri).orEmpty()
         val fromMime = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
         if (!fromMime.isNullOrBlank()) return fromMime
+        val fromDisplayName = runCatching {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(0)
+                    } else null
+                }
+        }.getOrNull()?.substringAfterLast('.', "")
+        if (!fromDisplayName.isNullOrBlank()) return fromDisplayName
         val fromPath = MimeTypeMap.getFileExtensionFromUrl(uri.toString())
         return fromPath.ifBlank { fallbackExtension }
     }
