@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -47,8 +48,7 @@ import com.flue.launcher.ui.anim.faceLayerValues
 import com.flue.launcher.ui.anim.notificationLayerValues
 import com.flue.launcher.ui.anim.scaleBlurAlpha
 import com.flue.launcher.ui.anim.stackLayerValues
-import com.flue.launcher.ui.drawer.HoneycombScreen
-import com.flue.launcher.ui.drawer.ListDrawerScreen
+import com.flue.launcher.ui.drawer.NativeDrawerHost
 import com.flue.launcher.ui.home.WatchFaceLayer
 import com.flue.launcher.ui.navigation.GestureHost
 import com.flue.launcher.ui.navigation.LayoutMode
@@ -282,39 +282,24 @@ fun LauncherScreen(vm: LauncherViewModel) {
                         origin = if (useOrigin) appOpenOrigin else null
                     )
             ) {
-                when (layoutMode) {
-                    LayoutMode.Honeycomb -> HoneycombScreen(
-                        apps = apps,
-                        blurEnabled = blurEnabled,
-                        edgeBlurEnabled = edgeBlurEnabled,
-                        suppressHeavyEffects = reduceLegacyDrawerEffects,
-                        narrowCols = honeycombCols,
-                        topBlurRadiusDp = honeycombTopBlur,
-                        bottomBlurRadiusDp = honeycombBottomBlur,
-                        topFadeRangeDp = honeycombTopFade,
-                        bottomFadeRangeDp = honeycombBottomFade,
-                        onAppClick = { appInfo, origin ->
-                            val launchDelay = BASE_LAUNCH_MASK_DELAY_MS + if (splashIcon) splashDelay.toLong() else 0L
-                            vm.openApp(appInfo, origin, launchDelay)
-                        },
-                        onReorder = { from, to -> vm.swapApps(from, to) },
-                        onScrollToTop = { vm.setState(ScreenState.Face) }
-                    )
-                    LayoutMode.List -> ListDrawerScreen(
-                        apps = apps,
-                        blurEnabled = blurEnabled,
-                        edgeBlurEnabled = edgeBlurEnabled,
-                        suppressHeavyEffects = reduceLegacyDrawerEffects,
-                        topFadeRangeDp = honeycombTopFade,
-                        bottomFadeRangeDp = honeycombBottomFade,
-                        onAppClick = { appInfo, origin ->
-                            val launchDelay = BASE_LAUNCH_MASK_DELAY_MS + if (splashIcon) splashDelay.toLong() else 0L
-                            vm.openApp(appInfo, origin, launchDelay)
-                        },
-                        onReorder = { from, to -> vm.swapApps(from, to) },
-                        onScrollToTop = { vm.setState(ScreenState.Face) }
-                    )
-                }
+                NativeDrawerHost(
+                    apps = apps,
+                    layoutMode = layoutMode,
+                    blurEnabled = blurEnabled,
+                    edgeBlurEnabled = edgeBlurEnabled,
+                    suppressHeavyEffects = reduceLegacyDrawerEffects,
+                    narrowCols = honeycombCols,
+                    topBlurRadiusDp = honeycombTopBlur,
+                    bottomBlurRadiusDp = honeycombBottomBlur,
+                    topFadeRangeDp = honeycombTopFade,
+                    bottomFadeRangeDp = honeycombBottomFade,
+                    onAppClick = { appInfo, origin ->
+                        val launchDelay = BASE_LAUNCH_MASK_DELAY_MS + if (splashIcon) splashDelay.toLong() else 0L
+                        vm.openApp(appInfo, origin, launchDelay)
+                    },
+                    onReorder = { from, to -> vm.swapApps(from, to) },
+                    onScrollToTop = { vm.setState(ScreenState.Face) }
+                )
             }
 
             if (screenState == ScreenState.App) {
@@ -349,7 +334,7 @@ fun LauncherScreen(vm: LauncherViewModel) {
                     ) {
                         currentApp?.let { app ->
                             Image(
-                                bitmap = app.cachedIcon,
+                                bitmap = app.cachedIcon.asImageBitmap(),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(96.dp)

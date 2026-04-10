@@ -94,6 +94,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.datastore.preferences)
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

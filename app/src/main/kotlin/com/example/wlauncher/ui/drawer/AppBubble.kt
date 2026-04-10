@@ -1,5 +1,6 @@
 package com.flue.launcher.ui.drawer
 
+import android.graphics.Bitmap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -21,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -30,7 +31,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppBubble(
-    icon: ImageBitmap,
+    icon: Bitmap,
     size: Dp = 54.dp,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -44,6 +45,7 @@ fun AppBubble(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val activePressed = isPressed || forcePressed
+    val iconBitmap = remember(icon) { icon.asImageBitmap() }
     val pressedScale by animateFloatAsState(
         targetValue = if (activePressed) pressScaleTarget else 1f,
         animationSpec = tween(
@@ -85,7 +87,7 @@ fun AppBubble(
         contentAlignment = Alignment.Center
     ) {
         Image(
-            bitmap = icon,
+            bitmap = iconBitmap,
             contentDescription = null,
             filterQuality = FilterQuality.Medium,
             modifier = Modifier

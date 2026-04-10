@@ -49,6 +49,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -117,6 +118,16 @@ fun ListDrawerScreen(
     var settlingKey by remember { mutableStateOf<String?>(null) }
     val settlingCenterY = remember { Animatable(0f) }
     var focusReady by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState.layoutInfo.visibleItemsInfo, apps.size, dragFromIndex, dragCurrentIndex) {
+        val keep = buildSet {
+            listState.layoutInfo.visibleItemsInfo.forEach { add(it.index) }
+            dragFromIndex?.let(::add)
+            dragCurrentIndex?.let(::add)
+        }
+        itemCenters.keys.retainAll(keep)
+        itemHeights.keys.retainAll(keep)
+    }
 
     LaunchedEffect(focusReady) {
         if (focusReady) {
@@ -476,7 +487,7 @@ fun ListDrawerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Image(
-                            bitmap = displayIcon,
+                            bitmap = displayIcon.asImageBitmap(),
                             contentDescription = app.label,
                             modifier = Modifier
                                 .size(iconSize)
@@ -537,7 +548,7 @@ fun ListDrawerScreen(
                             draggedApp.cachedBlurredIcon
                         } else {
                             draggedApp.cachedIcon
-                        },
+                        }.asImageBitmap(),
                         contentDescription = draggedApp.label,
                         modifier = Modifier
                             .size(iconSize)

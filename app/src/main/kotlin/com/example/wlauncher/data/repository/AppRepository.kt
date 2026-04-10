@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ActivityNotFoundException
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
@@ -12,7 +13,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import com.flue.launcher.data.model.AppInfo
 import com.flue.launcher.iconpack.IconPackMapping
@@ -151,8 +151,8 @@ class AppRepository(private val context: Context) {
                     packageName = packageName,
                     activityName = ri.activityInfo.name,
                     icon = resolvedIconDrawable,
-                    cachedIcon = iconBitmap.asImageBitmap(),
-                    cachedBlurredIcon = blurredBitmap.asImageBitmap()
+                    cachedIcon = iconBitmap,
+                    cachedBlurredIcon = blurredBitmap
                 )
             }
         if (synchronized(this) { generation != refreshGeneration }) return
@@ -160,7 +160,7 @@ class AppRepository(private val context: Context) {
         applyFilters()
     }
 
-    fun launchApp(appInfo: AppInfo) {
+    fun launchApp(appInfo: AppInfo): Boolean {
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
             component = ComponentName(appInfo.packageName, appInfo.activityName)
@@ -171,7 +171,16 @@ class AppRepository(private val context: Context) {
             android.R.anim.fade_in,
             android.R.anim.fade_out
         )
-        context.startActivity(intent, options.toBundle())
+        return try {
+            context.startActivity(intent, options.toBundle())
+            true
+        } catch (_: ActivityNotFoundException) {
+            refreshAsync()
+            false
+        } catch (_: SecurityException) {
+            refreshAsync()
+            false
+        }
     }
 
     fun destroy() {

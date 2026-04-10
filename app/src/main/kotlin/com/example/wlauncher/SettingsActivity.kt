@@ -2,6 +2,7 @@ package com.flue.launcher
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -77,7 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -1046,7 +1047,7 @@ private fun SettingsSwitchRow(
     enabled: Boolean = true,
     onToggle: (Boolean) -> Unit,
     scale: Float,
-    leadingIcon: ImageBitmap? = null,
+    leadingIcon: Bitmap? = null,
     reserveLeadingIconSpace: Boolean = false
 ) {
     val pressedState = rememberPressedState()
@@ -1104,7 +1105,7 @@ private fun SettingsSwitchRow(
                     ) {
                         if (leadingIcon != null) {
                             Image(
-                                bitmap = leadingIcon,
+                                bitmap = leadingIcon.asImageBitmap(),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
