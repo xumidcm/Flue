@@ -22,6 +22,7 @@ data class LayerAnimValues(
  */
 fun faceLayerValues(state: ScreenState): LayerAnimValues = when (state) {
     ScreenState.Face -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f)
+    ScreenState.SideScreen -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f)
     ScreenState.Apps, ScreenState.Settings -> LayerAnimValues(scale = 2.5f, blur = 15f, alpha = 0f)
     ScreenState.App -> LayerAnimValues(scale = 2.5f, blur = 15f, alpha = 0f)
     ScreenState.Stack -> LayerAnimValues(scale = 0.85f, blur = 5f, alpha = 0.3f)
@@ -35,6 +36,7 @@ fun faceLayerValues(state: ScreenState): LayerAnimValues = when (state) {
  */
 fun appListLayerValues(state: ScreenState): LayerAnimValues = when (state) {
     ScreenState.Face -> LayerAnimValues(scale = 0.2f, blur = 10f, alpha = 0f)
+    ScreenState.SideScreen -> LayerAnimValues(scale = 0.2f, blur = 10f, alpha = 0f)
     ScreenState.Apps -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f)
     ScreenState.Settings -> LayerAnimValues(scale = 0.9f, blur = 8f, alpha = 0.3f)
     ScreenState.App -> LayerAnimValues(scale = 4f, blur = 10f, alpha = 0f)
@@ -58,6 +60,13 @@ fun stackLayerValues(state: ScreenState): LayerAnimValues = when (state) {
     ScreenState.Stack -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f, translationY = 0f)
     ScreenState.Apps -> LayerAnimValues(scale = 1.5f, blur = 12f, alpha = 0f, translationY = -0.5f)
     else -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 0f, translationY = 1f)
+}
+
+fun sideScreenLayerValues(state: ScreenState): LayerAnimValues = when (state) {
+    ScreenState.SideScreen -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f, translationY = 0f)
+    ScreenState.Notifications -> LayerAnimValues(scale = 0.98f, blur = 0f, alpha = 0.32f, translationY = 0f)
+    ScreenState.App -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 1f, translationY = 0f)
+    else -> LayerAnimValues(scale = 1f, blur = 0f, alpha = 0f, translationY = 0f)
 }
 
 /**

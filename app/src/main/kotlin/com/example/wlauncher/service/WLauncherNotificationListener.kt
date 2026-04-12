@@ -1,8 +1,6 @@
 package com.flue.launcher.service
 
 import android.app.Notification
-import android.content.pm.PackageManager
-import android.graphics.drawable.Icon
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.compose.ui.graphics.ImageBitmap
@@ -14,11 +12,15 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class NotifData(
     val key: String,
+    val packageName: String,
+    val groupKey: String?,
     val appLabel: String,
     val title: String,
     val text: String,
     val time: Long,
-    val icon: ImageBitmap?
+    val icon: ImageBitmap?,
+    val isClearable: Boolean,
+    val contentIntentAvailable: Boolean
 )
 
 class WLauncherNotificationListener : NotificationListenerService() {
@@ -27,22 +29,43 @@ class WLauncherNotificationListener : NotificationListenerService() {
         private val _notifications = MutableStateFlow<List<NotifData>>(emptyList())
         val notifications: StateFlow<List<NotifData>> = _notifications.asStateFlow()
 
+        private val _connected = MutableStateFlow(false)
+        val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
         private var instance: WLauncherNotificationListener? = null
 
-        fun isConnected() = instance != null
+        fun isConnected(): Boolean = instance != null
 
         fun dismissNotification(key: String) {
             instance?.cancelNotification(key)
+        }
+
+        fun dismissNotifications(keys: Collection<String>) {
+            instance?.let { listener ->
+                keys.forEach(listener::cancelNotification)
+            }
+        }
+
+        fun openNotification(key: String): Boolean {
+            val listener = instance ?: return false
+            val sbn = listener.activeNotifications?.firstOrNull { it.key == key } ?: return false
+            val pendingIntent = sbn.notification.contentIntent ?: return false
+            return runCatching {
+                pendingIntent.send()
+            }.isSuccess
         }
     }
 
     override fun onListenerConnected() {
         instance = this
+        _connected.value = true
         refreshNotifications()
     }
 
     override fun onListenerDisconnected() {
         instance = null
+        _connected.value = false
+        _notifications.value = emptyList()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -60,28 +83,38 @@ class WLauncherNotificationListener : NotificationListenerService() {
             _notifications.value = sbns
                 .filter { it.notification.flags and Notification.FLAG_ONGOING_EVENT == 0 }
                 .sortedByDescending { it.postTime }
-                .take(20)
+                .take(30)
                 .map { sbn ->
-                    val n = sbn.notification
-                    val extras = n.extras
+                    val notification = sbn.notification
+                    val extras = notification.extras
                     val appLabel = try {
                         pm.getApplicationLabel(pm.getApplicationInfo(sbn.packageName, 0)).toString()
-                    } catch (_: Exception) { sbn.packageName }
-
+                    } catch (_: Exception) {
+                        sbn.packageName
+                    }
                     val iconBitmap = try {
-                        val smallIcon = n.smallIcon
-                        smallIcon?.loadDrawable(applicationContext)?.toBitmap(48, 48)?.asImageBitmap()
-                    } catch (_: Exception) { null }
+                        notification.smallIcon
+                            ?.loadDrawable(applicationContext)
+                            ?.toBitmap(48, 48)
+                            ?.asImageBitmap()
+                    } catch (_: Exception) {
+                        null
+                    }
 
                     NotifData(
                         key = sbn.key,
+                        packageName = sbn.packageName,
+                        groupKey = sbn.groupKey,
                         appLabel = appLabel,
-                        title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "",
-                        text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "",
+                        title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
+                        text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
                         time = sbn.postTime,
-                        icon = iconBitmap
+                        icon = iconBitmap,
+                        isClearable = sbn.isClearable,
+                        contentIntentAvailable = notification.contentIntent != null
                     )
                 }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 }

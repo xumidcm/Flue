@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.datastore.core.DataStore
@@ -19,28 +20,35 @@ import com.flue.launcher.data.model.AppInfo
 import com.flue.launcher.data.repository.AppRepository
 import com.flue.launcher.iconpack.IconPackDescriptor
 import com.flue.launcher.iconpack.IconPackScanner
+import com.flue.launcher.service.NotifData
+import com.flue.launcher.service.WLauncherNotificationListener
 import com.flue.launcher.ui.navigation.LayoutMode
 import com.flue.launcher.ui.navigation.ScreenState
+import com.flue.launcher.ui.notification.NotificationEntryUi
+import com.flue.launcher.ui.notification.NotificationGroupUi
+import com.flue.launcher.ui.notification.NotificationRevealTarget
 import com.flue.launcher.watchface.BUILT_IN_WATCHFACE_ID
-import com.flue.launcher.watchface.BUILT_IN_PHOTO_WATCHFACE_ID
-import com.flue.launcher.watchface.BUILT_IN_VIDEO_WATCHFACE_ID
-import com.flue.launcher.watchface.WatchClockPosition
-import com.flue.launcher.watchface.WatchClockColorMode
 import com.flue.launcher.watchface.InternalWatchFaceStorage
 import com.flue.launcher.watchface.LunchWatchFaceDescriptor
 import com.flue.launcher.watchface.LunchWatchFaceRegistry
 import com.flue.launcher.watchface.LunchWatchFaceScanner
+import com.flue.launcher.watchface.WatchClockColorMode
+import com.flue.launcher.watchface.WatchClockPosition
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "launcher_settings")
+
+private const val SIDE_SCREEN_MAX_SLOTS = 9
+private const val SIDE_SCREEN_PERSIST_SEPARATOR = "|"
 
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -60,6 +68,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val KEY_HONEYCOMB_TOP_FADE = intPreferencesKey("honeycomb_top_fade")
         val KEY_HONEYCOMB_BOTTOM_FADE = intPreferencesKey("honeycomb_bottom_fade")
         val KEY_SHOW_NOTIFICATION = booleanPreferencesKey("show_notification")
+        val KEY_SIDE_SCREEN_ENABLED = booleanPreferencesKey("side_screen_enabled")
+        val KEY_SIDE_SCREEN_SHORTCUTS = stringPreferencesKey("side_screen_shortcuts")
         val KEY_HIDDEN_APPS = stringPreferencesKey("hidden_apps")
         val KEY_ICON_PACK_PACKAGE = stringPreferencesKey("icon_pack_package")
         val KEY_SELECTED_WATCHFACE_ID = stringPreferencesKey("selected_watchface_id")
@@ -89,6 +99,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _layoutMode = MutableStateFlow(LayoutMode.Honeycomb)
     val layoutMode: StateFlow<LayoutMode> = _layoutMode.asStateFlow()
 
+    private val _sideScreenEnabled = MutableStateFlow(true)
+    val sideScreenEnabled: StateFlow<Boolean> = _sideScreenEnabled.asStateFlow()
+
+    private val _notificationCenterEnabled = MutableStateFlow(true)
+    val notificationCenterEnabled: StateFlow<Boolean> = _notificationCenterEnabled.asStateFlow()
+
+    private val _sideScreenShortcutKeys = MutableStateFlow(List<String?>(SIDE_SCREEN_MAX_SLOTS) { null })
+    val sideScreenShortcutKeys: StateFlow<List<String?>> = _sideScreenShortcutKeys.asStateFlow()
+
+    private val _notificationAccessGranted = MutableStateFlow(false)
+    val notificationAccessGranted: StateFlow<Boolean> = _notificationAccessGranted.asStateFlow()
+
+    private val _rawNotifications = MutableStateFlow<List<NotifData>>(emptyList())
+    private val _notificationGroups = MutableStateFlow<List<NotificationGroupUi>>(emptyList())
+    val notificationGroups: StateFlow<List<NotificationGroupUi>> = _notificationGroups.asStateFlow()
+
+    private val _expandedNotificationPackages = MutableStateFlow<Set<String>>(emptySet())
+    private val _revealedNotificationTarget = MutableStateFlow<NotificationRevealTarget?>(null)
+    val revealedNotificationTarget: StateFlow<NotificationRevealTarget?> = _revealedNotificationTarget.asStateFlow()
+
     private val _blurEnabled = MutableStateFlow(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
     val blurEnabled: StateFlow<Boolean> = _blurEnabled.asStateFlow()
 
@@ -109,6 +139,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private val _honeycombCols = MutableStateFlow(3)
     val honeycombCols: StateFlow<Int> = _honeycombCols.asStateFlow()
+
     private val _legacyCircularIcons = MutableStateFlow(false)
     val legacyCircularIcons: StateFlow<Boolean> = _legacyCircularIcons.asStateFlow()
 
@@ -126,9 +157,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private val _splashIcon = MutableStateFlow(true)
     val splashIcon: StateFlow<Boolean> = _splashIcon.asStateFlow()
-
-    private val _showNotification = MutableStateFlow(false)
-    val showNotification: StateFlow<Boolean> = _showNotification.asStateFlow()
 
     private val _hiddenApps = MutableStateFlow<Set<String>>(emptySet())
     val hiddenApps: StateFlow<Set<String>> = _hiddenApps.asStateFlow()
@@ -183,6 +211,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private val _builtInVideoFillScreen = MutableStateFlow(true)
     val builtInVideoFillScreen: StateFlow<Boolean> = _builtInVideoFillScreen.asStateFlow()
+
     private val _builtInVideoClockColorMode = MutableStateFlow(WatchClockColorMode.AUTO)
     val builtInVideoClockColorMode: StateFlow<WatchClockColorMode> = _builtInVideoClockColorMode.asStateFlow()
 
@@ -195,6 +224,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val _currentApp = MutableStateFlow<AppInfo?>(null)
     val currentApp: StateFlow<AppInfo?> = _currentApp.asStateFlow()
 
+    private val _launchSourceState = MutableStateFlow(ScreenState.Apps)
+    val launchSourceState: StateFlow<ScreenState> = _launchSourceState.asStateFlow()
+
     private var launchingExternalApp = false
     private var launchJob: Job? = null
     private var watchFacePrefsHydrated = false
@@ -202,16 +234,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private var lastWatchFaceRefreshAt = 0L
     private val pendingWriteJobs = ConcurrentHashMap<String, Job>()
     private var refreshIconsJob: Job? = null
+
     init {
         refreshIconPacks()
+        observePreferences()
+        observeNotifications()
+        refreshWatchFaces()
+        refreshNotificationAccess()
+    }
+
+    private fun observePreferences() {
         viewModelScope.launch(Dispatchers.IO) {
             store.data.collect { prefs ->
                 val loadedLayout = prefs[KEY_LAYOUT]?.let {
-                    try {
-                        LayoutMode.valueOf(it)
-                    } catch (_: Exception) {
-                        LayoutMode.Honeycomb
-                    }
+                    runCatching { LayoutMode.valueOf(it) }.getOrDefault(LayoutMode.Honeycomb)
                 } ?: LayoutMode.Honeycomb
                 if (_layoutMode.value != loadedLayout) _layoutMode.value = loadedLayout
 
@@ -244,10 +280,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 val loadedSplashDelay = (prefs[KEY_SPLASH_DELAY] ?: 500).coerceIn(300, 1500)
                 if (_splashDelay.value != loadedSplashDelay) _splashDelay.value = loadedSplashDelay
 
-                val loadedOrder = prefs[KEY_APP_ORDER]
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.split(",")
-                    ?: emptyList()
+                val loadedOrder = prefs[KEY_APP_ORDER]?.takeIf { it.isNotEmpty() }?.split(",") ?: emptyList()
                 if (_appOrder.value != loadedOrder) {
                     _appOrder.value = loadedOrder
                     appRepository.setCustomOrder(loadedOrder)
@@ -268,14 +301,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 val loadedBottomFade = (prefs[KEY_HONEYCOMB_BOTTOM_FADE] ?: 56).coerceIn(0, 160)
                 if (_honeycombBottomFade.value != loadedBottomFade) _honeycombBottomFade.value = loadedBottomFade
 
-                val loadedShowNotification = prefs[KEY_SHOW_NOTIFICATION] ?: false
-                if (_showNotification.value != loadedShowNotification) _showNotification.value = loadedShowNotification
+                val loadedNotificationCenter = prefs[KEY_SHOW_NOTIFICATION] ?: true
+                if (_notificationCenterEnabled.value != loadedNotificationCenter) _notificationCenterEnabled.value = loadedNotificationCenter
 
-                val hidden = prefs[KEY_HIDDEN_APPS]
-                    ?.split(",")
-                    ?.filter(String::isNotBlank)
-                    ?.toSet()
-                    ?: emptySet()
+                val loadedSideScreen = prefs[KEY_SIDE_SCREEN_ENABLED] ?: true
+                if (_sideScreenEnabled.value != loadedSideScreen) _sideScreenEnabled.value = loadedSideScreen
+
+                val loadedShortcuts = decodeSideScreenShortcuts(prefs[KEY_SIDE_SCREEN_SHORTCUTS])
+                if (_sideScreenShortcutKeys.value != loadedShortcuts) _sideScreenShortcutKeys.value = loadedShortcuts
+
+                val hidden = prefs[KEY_HIDDEN_APPS]?.split(",")?.filter(String::isNotBlank)?.toSet() ?: emptySet()
                 if (_hiddenApps.value != hidden) {
                     _hiddenApps.value = hidden
                     appRepository.setHiddenComponents(hidden)
@@ -299,19 +334,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 val loadedVideoPath = prefs[KEY_BUILTIN_VIDEO_PATH]
                 if (_builtInVideoPath.value != loadedVideoPath) _builtInVideoPath.value = loadedVideoPath
 
-                val loadedPhotoClockPosition = prefs[KEY_PHOTO_CLOCK_POSITION]
-                    ?.let(::parseClockPosition)
-                    ?: WatchClockPosition.CENTER
-                if (_builtInPhotoClockPosition.value != loadedPhotoClockPosition) {
-                    _builtInPhotoClockPosition.value = loadedPhotoClockPosition
-                }
+                val loadedPhotoClockPosition = prefs[KEY_PHOTO_CLOCK_POSITION]?.let(::parseClockPosition) ?: WatchClockPosition.CENTER
+                if (_builtInPhotoClockPosition.value != loadedPhotoClockPosition) _builtInPhotoClockPosition.value = loadedPhotoClockPosition
 
-                val loadedVideoClockPosition = prefs[KEY_VIDEO_CLOCK_POSITION]
-                    ?.let(::parseClockPosition)
-                    ?: WatchClockPosition.CENTER
-                if (_builtInVideoClockPosition.value != loadedVideoClockPosition) {
-                    _builtInVideoClockPosition.value = loadedVideoClockPosition
-                }
+                val loadedVideoClockPosition = prefs[KEY_VIDEO_CLOCK_POSITION]?.let(::parseClockPosition) ?: WatchClockPosition.CENTER
+                if (_builtInVideoClockPosition.value != loadedVideoClockPosition) _builtInVideoClockPosition.value = loadedVideoClockPosition
 
                 val loadedPhotoClockSize = (prefs[KEY_PHOTO_CLOCK_SIZE] ?: 64).coerceIn(28, 92)
                 if (_builtInPhotoClockSize.value != loadedPhotoClockSize) _builtInPhotoClockSize.value = loadedPhotoClockSize
@@ -327,30 +354,56 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
                 val loadedVideoFillScreen = prefs[KEY_VIDEO_FILL_SCREEN] ?: true
                 if (_builtInVideoFillScreen.value != loadedVideoFillScreen) _builtInVideoFillScreen.value = loadedVideoFillScreen
-                val loadedVideoClockColorMode = prefs[KEY_VIDEO_CLOCK_COLOR_MODE]
-                    ?.let(::parseClockColorMode)
-                    ?: WatchClockColorMode.AUTO
-                if (_builtInVideoClockColorMode.value != loadedVideoClockColorMode) {
-                    _builtInVideoClockColorMode.value = loadedVideoClockColorMode
-                }
+
+                val loadedVideoClockColorMode = prefs[KEY_VIDEO_CLOCK_COLOR_MODE]?.let(::parseClockColorMode) ?: WatchClockColorMode.AUTO
+                if (_builtInVideoClockColorMode.value != loadedVideoClockColorMode) _builtInVideoClockColorMode.value = loadedVideoClockColorMode
 
                 val loadedManagerThumbnails = prefs[KEY_BUILTIN_MANAGER_THUMBNAILS] ?: true
                 if (_builtInManagerThumbnails.value != loadedManagerThumbnails) _builtInManagerThumbnails.value = loadedManagerThumbnails
 
                 watchFacePrefsHydrated = true
                 syncSelectedWatchFace()
+                rebuildNotificationGroups()
             }
         }
-        refreshWatchFaces()
+    }
+
+    private fun observeNotifications() {
+        viewModelScope.launch {
+            WLauncherNotificationListener.notifications.collect { notifications ->
+                _rawNotifications.value = notifications
+                rebuildNotificationGroups()
+            }
+        }
+        viewModelScope.launch {
+            WLauncherNotificationListener.connected.collect {
+                refreshNotificationAccess()
+            }
+        }
     }
 
     fun setState(state: ScreenState) {
-        _screenState.value = state
+        _screenState.value = sanitizeState(state)
     }
 
-    fun openApp(appInfo: AppInfo, origin: Offset = Offset(0.5f, 0.5f), launchDelayMs: Long = _splashDelay.value.toLong()) {
+    fun refreshNotificationAccess() {
+        val packageName = getApplication<Application>().packageName
+        val enabledListeners = Settings.Secure.getString(
+            getApplication<Application>().contentResolver,
+            "enabled_notification_listeners"
+        ).orEmpty()
+        _notificationAccessGranted.value = enabledListeners.contains(packageName)
+    }
+
+    fun openApp(
+        appInfo: AppInfo,
+        origin: Offset = Offset(0.5f, 0.5f),
+        launchDelayMs: Long = _splashDelay.value.toLong(),
+        sourceState: ScreenState = ScreenState.Apps
+    ) {
         _currentApp.value = appInfo
         _appOpenOrigin.value = origin
+        _launchSourceState.value = sourceState
         _screenState.value = ScreenState.App
 
         launchJob?.cancel()
@@ -362,8 +415,37 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             } else {
                 launchingExternalApp = false
                 _currentApp.value = null
-                _screenState.value = ScreenState.Apps
+                _screenState.value = sanitizeState(sourceState)
                 Toast.makeText(getApplication(), "应用无法启动，已刷新列表", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun openNotification(
+        key: String,
+        packageName: String,
+        origin: Offset,
+        launchDelayMs: Long = _splashDelay.value.toLong(),
+        sourceState: ScreenState = ScreenState.Notifications
+    ) {
+        val fallbackApp = resolveApp(packageName)
+        _currentApp.value = fallbackApp
+        _appOpenOrigin.value = origin
+        _launchSourceState.value = sourceState
+        _screenState.value = ScreenState.App
+
+        launchJob?.cancel()
+        launchJob = viewModelScope.launch {
+            delay(launchDelayMs)
+            val openedNotification = WLauncherNotificationListener.openNotification(key)
+            val launched = openedNotification || (fallbackApp?.let(appRepository::launchApp) == true)
+            if (launched) {
+                launchingExternalApp = true
+            } else {
+                launchingExternalApp = false
+                _currentApp.value = null
+                _screenState.value = sanitizeState(sourceState)
+                Toast.makeText(getApplication(), "通知无法打开，已尝试回退应用启动", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -371,44 +453,112 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun onReturnToLauncher() {
         if (launchingExternalApp) {
             launchingExternalApp = false
-            _screenState.value = ScreenState.Apps
+            _screenState.value = sanitizeState(_launchSourceState.value)
         }
     }
 
     fun handleHomePress() {
         when (_screenState.value) {
             ScreenState.Face -> _screenState.value = ScreenState.Apps
-            ScreenState.Apps -> _screenState.value = ScreenState.Face
+            ScreenState.SideScreen, ScreenState.Notifications, ScreenState.Apps -> _screenState.value = ScreenState.Face
             ScreenState.App -> {
                 launchJob?.cancel()
                 launchJob = null
                 launchingExternalApp = false
-                _screenState.value = ScreenState.Apps
+                _screenState.value = sanitizeState(_launchSourceState.value)
             }
-            else -> _screenState.value = ScreenState.Face
+            ScreenState.Settings -> _screenState.value = ScreenState.Face
+            ScreenState.Stack, ScreenState.ControlCenter -> _screenState.value = ScreenState.Face
         }
     }
 
     fun handleBackPress() {
         when (_screenState.value) {
             ScreenState.Face -> Unit
+            ScreenState.SideScreen -> _screenState.value = ScreenState.Face
+            ScreenState.Notifications -> _screenState.value = if (_sideScreenEnabled.value) ScreenState.SideScreen else ScreenState.Face
             ScreenState.Apps -> _screenState.value = ScreenState.Face
             ScreenState.App -> {
                 launchJob?.cancel()
                 launchJob = null
                 launchingExternalApp = false
-                _screenState.value = ScreenState.Apps
+                _screenState.value = sanitizeState(_launchSourceState.value)
             }
-            ScreenState.Settings -> _screenState.value = ScreenState.Apps
-            ScreenState.Stack -> _screenState.value = ScreenState.Face
-            ScreenState.Notifications -> _screenState.value = ScreenState.Face
-            ScreenState.ControlCenter -> _screenState.value = ScreenState.Face
+            ScreenState.Settings -> _screenState.value = ScreenState.Face
+            ScreenState.Stack, ScreenState.ControlCenter -> _screenState.value = ScreenState.Face
         }
     }
 
     fun setLayoutMode(mode: LayoutMode) {
         _layoutMode.value = mode
         persist { store.edit { it[KEY_LAYOUT] = mode.name } }
+    }
+
+    fun setSideScreenEnabled(enabled: Boolean) {
+        _sideScreenEnabled.value = enabled
+        if (!enabled && (_screenState.value == ScreenState.SideScreen || _screenState.value == ScreenState.Notifications)) {
+            _screenState.value = ScreenState.Face
+        }
+        persist { store.edit { it[KEY_SIDE_SCREEN_ENABLED] = enabled } }
+    }
+
+    fun setNotificationCenterEnabled(enabled: Boolean) {
+        _notificationCenterEnabled.value = enabled
+        if (!enabled && _screenState.value == ScreenState.Notifications) {
+            _screenState.value = if (_sideScreenEnabled.value) ScreenState.SideScreen else ScreenState.Face
+        }
+        persist { store.edit { it[KEY_SHOW_NOTIFICATION] = enabled } }
+    }
+
+    fun setSideScreenShortcut(slotIndex: Int, componentKey: String?) {
+        if (slotIndex !in 0 until SIDE_SCREEN_MAX_SLOTS) return
+        val normalized = componentKey?.takeIf { it.isNotBlank() }
+        val next = _sideScreenShortcutKeys.value.toMutableList()
+        if (normalized != null) {
+            for (index in next.indices) {
+                if (next[index] == normalized) {
+                    next[index] = null
+                }
+            }
+        }
+        next[slotIndex] = normalized
+        _sideScreenShortcutKeys.value = next
+        persist { store.edit { it[KEY_SIDE_SCREEN_SHORTCUTS] = encodeSideScreenShortcuts(next) } }
+    }
+
+    fun removeSideScreenShortcut(slotIndex: Int) {
+        setSideScreenShortcut(slotIndex, null)
+    }
+
+    fun setRevealedNotificationTarget(target: NotificationRevealTarget?) {
+        _revealedNotificationTarget.value = target
+    }
+
+    fun toggleNotificationGroup(packageName: String) {
+        val next = _expandedNotificationPackages.value.toMutableSet().apply {
+            if (!add(packageName)) remove(packageName)
+        }
+        _expandedNotificationPackages.value = next
+        rebuildNotificationGroups()
+    }
+
+    fun dismissNotification(key: String) {
+        _revealedNotificationTarget.value = null
+        _rawNotifications.value = _rawNotifications.value.filterNot { it.key == key }
+        rebuildNotificationGroups()
+        WLauncherNotificationListener.dismissNotification(key)
+    }
+
+    fun dismissNotificationGroup(packageName: String) {
+        val clearableKeys = _rawNotifications.value
+            .filter { it.packageName == packageName && it.isClearable }
+            .map { it.key }
+        if (clearableKeys.isEmpty()) return
+        _revealedNotificationTarget.value = null
+        _rawNotifications.value = _rawNotifications.value.filterNot { it.key in clearableKeys }
+        _expandedNotificationPackages.value = _expandedNotificationPackages.value - packageName
+        rebuildNotificationGroups()
+        WLauncherNotificationListener.dismissNotifications(clearableKeys)
     }
 
     fun setBlurEnabled(enabled: Boolean) {
@@ -466,8 +616,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun setHoneycombCols(cols: Int) {
         _honeycombCols.value = cols.coerceIn(3, 6)
-        val savedValue = _honeycombCols.value
-        persistDebounced("key_honeycomb_cols") { store.edit { it[KEY_HONEYCOMB_COLS] = savedValue } }
+        val value = _honeycombCols.value
+        persistDebounced("key_honeycomb_cols") { store.edit { it[KEY_HONEYCOMB_COLS] = value } }
     }
 
     fun setHoneycombTopBlur(value: Int) {
@@ -494,11 +644,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         persistDebounced("key_honeycomb_bottom_fade") { store.edit { it[KEY_HONEYCOMB_BOTTOM_FADE] = savedValue } }
     }
 
-    fun setShowNotification(show: Boolean) {
-        _showNotification.value = show
-        persist { store.edit { it[KEY_SHOW_NOTIFICATION] = show } }
-    }
-
     fun setAppHidden(componentKey: String, hidden: Boolean) {
         val next = _hiddenApps.value.toMutableSet().apply {
             if (hidden) add(componentKey) else remove(componentKey)
@@ -522,9 +667,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshIconPacks() {
         viewModelScope.launch {
-            val packs = withContext(Dispatchers.IO) {
-                IconPackScanner.scanInstalled(getApplication())
-            }
+            val packs = withContext(Dispatchers.IO) { IconPackScanner.scanInstalled(getApplication()) }
             _availableIconPacks.value = packs
         }
     }
@@ -574,11 +717,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         persist {
             store.edit {
                 it[KEY_SELECTED_WATCHFACE_ID] = BUILT_IN_WATCHFACE_ID
-                if (error.isNullOrBlank()) {
-                    it.remove(KEY_LAST_WATCHFACE_ERROR)
-                } else {
-                    it[KEY_LAST_WATCHFACE_ERROR] = error
-                }
+                if (error.isNullOrBlank()) it.remove(KEY_LAST_WATCHFACE_ERROR)
+                else it[KEY_LAST_WATCHFACE_ERROR] = error
             }
         }
     }
@@ -675,6 +815,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun resetSettings() {
         val defaultBlurEnabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         _layoutMode.value = LayoutMode.Honeycomb
+        _sideScreenEnabled.value = true
+        _notificationCenterEnabled.value = true
+        _sideScreenShortcutKeys.value = List(SIDE_SCREEN_MAX_SLOTS) { null }
+        _expandedNotificationPackages.value = emptySet()
+        _revealedNotificationTarget.value = null
         _blurEnabled.value = defaultBlurEnabled
         _edgeBlurEnabled.value = false
         _lowResIcons.value = false
@@ -687,7 +832,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _honeycombBottomBlur.value = 4
         _honeycombTopFade.value = 56
         _honeycombBottomFade.value = 56
-        _showNotification.value = false
         _hiddenApps.value = emptySet()
         _selectedIconPackPackage.value = null
         _selectedWatchFaceId.value = BUILT_IN_WATCHFACE_ID
@@ -710,6 +854,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         persist {
             store.edit {
                 it[KEY_LAYOUT] = LayoutMode.Honeycomb.name
+                it[KEY_SIDE_SCREEN_ENABLED] = true
+                it[KEY_SHOW_NOTIFICATION] = true
+                it.remove(KEY_SIDE_SCREEN_SHORTCUTS)
                 it[KEY_BLUR] = defaultBlurEnabled
                 it[KEY_EDGE_BLUR] = false
                 it[KEY_LOW_RES] = false
@@ -722,7 +869,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 it[KEY_HONEYCOMB_TOP_FADE] = 56
                 it[KEY_HONEYCOMB_BOTTOM_FADE] = 56
                 it[KEY_LEGACY_CIRCULAR_ICONS] = false
-                it[KEY_SHOW_NOTIFICATION] = false
                 it.remove(KEY_HIDDEN_APPS)
                 it.remove(KEY_ICON_PACK_PACKAGE)
                 it[KEY_SELECTED_WATCHFACE_ID] = BUILT_IN_WATCHFACE_ID
@@ -738,6 +884,79 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 it.remove(KEY_LAST_WATCHFACE_ERROR)
             }
         }
+    }
+
+    private fun rebuildNotificationGroups() {
+        val expandedPackages = _expandedNotificationPackages.value
+        _notificationGroups.value = _rawNotifications.value
+            .groupBy { it.packageName }
+            .values
+            .map { group ->
+                val sortedEntries = group.sortedByDescending { it.time }.map { it.toNotificationEntryUi() }
+                NotificationGroupUi(
+                    packageName = group.first().packageName,
+                    appLabel = group.first().appLabel,
+                    icon = sortedEntries.firstOrNull()?.icon,
+                    latestTime = sortedEntries.firstOrNull()?.time ?: 0L,
+                    entries = sortedEntries,
+                    expanded = group.first().packageName in expandedPackages
+                )
+            }
+            .sortedByDescending { it.latestTime }
+    }
+
+    private fun NotifData.toNotificationEntryUi(): NotificationEntryUi {
+        return NotificationEntryUi(
+            key = key,
+            packageName = packageName,
+            groupKey = groupKey,
+            appLabel = appLabel,
+            title = title,
+            text = text,
+            time = time,
+            icon = icon,
+            isClearable = isClearable,
+            contentIntentAvailable = contentIntentAvailable
+        )
+    }
+
+    private fun sanitizeState(state: ScreenState): ScreenState {
+        return when (state) {
+            ScreenState.SideScreen -> if (_sideScreenEnabled.value) ScreenState.SideScreen else ScreenState.Face
+            ScreenState.Notifications -> {
+                if (!_notificationCenterEnabled.value) {
+                    if (_sideScreenEnabled.value) ScreenState.SideScreen else ScreenState.Face
+                } else {
+                    ScreenState.Notifications
+                }
+            }
+            else -> state
+        }
+    }
+
+    private fun resolveApp(packageName: String): AppInfo? {
+        return allApps.value.firstOrNull { it.packageName == packageName }
+            ?: apps.value.firstOrNull { it.packageName == packageName }
+    }
+
+    private fun encodeSideScreenShortcuts(keys: List<String?>): String {
+        return keys.mapIndexedNotNull { index, componentKey ->
+            componentKey?.takeIf { it.isNotBlank() }?.let { "$index:$it" }
+        }.joinToString(SIDE_SCREEN_PERSIST_SEPARATOR)
+    }
+
+    private fun decodeSideScreenShortcuts(raw: String?): List<String?> {
+        val slots = MutableList<String?>(SIDE_SCREEN_MAX_SLOTS) { null }
+        raw?.takeIf { it.isNotBlank() }
+            ?.split(SIDE_SCREEN_PERSIST_SEPARATOR)
+            ?.forEach { token ->
+                val separatorIndex = token.indexOf(':')
+                if (separatorIndex <= 0) return@forEach
+                val index = token.substring(0, separatorIndex).toIntOrNull() ?: return@forEach
+                val value = token.substring(separatorIndex + 1).takeIf { it.isNotBlank() } ?: return@forEach
+                if (index in slots.indices) slots[index] = value
+            }
+        return slots
     }
 
     private fun parseClockColorMode(raw: String): WatchClockColorMode {

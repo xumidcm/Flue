@@ -96,6 +96,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.flue.launcher.ui.common.instantPressGesture
+import com.flue.launcher.ui.common.rememberPressedState
 import com.flue.launcher.ui.input.flueRotaryScrollable
 import com.flue.launcher.ui.input.requestFocusAfterFirstFrame
 import com.flue.launcher.ui.navigation.LayoutMode
@@ -179,6 +181,8 @@ private fun SettingsRootScreen(
     val selectedIconPackPackage by vm.selectedIconPackPackage.collectAsState()
     val watchFaceLastError by vm.watchFaceLastError.collectAsState()
     val layoutMode by vm.layoutMode.collectAsState()
+    val sideScreenEnabled by vm.sideScreenEnabled.collectAsState()
+    val notificationCenterEnabled by vm.notificationCenterEnabled.collectAsState()
     val blurEnabled by vm.blurEnabled.collectAsState()
     val edgeBlurEnabled by vm.edgeBlurEnabled.collectAsState()
     val lowResIcons by vm.lowResIcons.collectAsState()
@@ -504,6 +508,25 @@ private fun SettingsRootScreen(
                     selected = layoutMode == LayoutMode.List,
                     onClick = { vm.setLayoutMode(LayoutMode.List) },
                     scale = itemFisheye(listState, "layout_list", screenCenterY, screenHeightPx)
+                )
+            }
+            item("side_screen_header") { SectionTitle("\u684c\u9762", itemFisheye(listState, "side_screen_header", screenCenterY, screenHeightPx)) }
+            item("side_screen_enabled") {
+                SettingsSwitchRow(
+                    title = "\u8d1f\u4e00\u5c4f",
+                    subtitle = if (sideScreenEnabled) "\u4ece\u8868\u76d8\u5411\u53f3\u6ed1\u52a8\u8fdb\u5165\u5feb\u6377\u542f\u52a8\u9875" else "\u5173\u95ed\u540e\u8868\u76d8\u4e0d\u518d\u8fdb\u5165\u8d1f\u4e00\u5c4f",
+                    checked = sideScreenEnabled,
+                    onToggle = { vm.setSideScreenEnabled(it) },
+                    scale = itemFisheye(listState, "side_screen_enabled", screenCenterY, screenHeightPx)
+                )
+            }
+            item("notification_center_enabled") {
+                SettingsSwitchRow(
+                    title = "\u901a\u77e5\u4e2d\u5fc3",
+                    subtitle = if (notificationCenterEnabled) "\u8d1f\u4e00\u5c4f\u663e\u793a\u901a\u77e5\u80f6\u56ca\uff0c\u5feb\u6377\u542f\u52a8\u4fdd\u6301 2 x 3" else "\u5173\u95ed\u540e\u9690\u85cf\u901a\u77e5\u533a\u57df\uff0c\u5feb\u6377\u542f\u52a8\u6269\u5c55\u4e3a 3 x 3",
+                    checked = notificationCenterEnabled,
+                    onToggle = { vm.setNotificationCenterEnabled(it) },
+                    scale = itemFisheye(listState, "notification_center_enabled", screenCenterY, screenHeightPx)
                 )
             }
             item("visual_header") { SectionTitle("\u89c6\u89c9", itemFisheye(listState, "visual_header", screenCenterY, screenHeightPx)) }
@@ -945,27 +968,6 @@ private fun SectionTitle(text: String, scale: Float) {
                 alpha = scale.coerceIn(0.55f, 1f)
             }
     )
-}
-
-@Composable
-private fun rememberPressedState(): MutableState<Boolean> = remember { mutableStateOf(false) }
-
-private fun Modifier.instantPressGesture(
-    pressedState: MutableState<Boolean>,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-): Modifier {
-    if (!enabled) return this
-    return pointerInput(onClick, enabled) {
-        detectTapGestures(
-            onPress = {
-                pressedState.value = true
-                val released = tryAwaitRelease()
-                pressedState.value = false
-                if (released) onClick()
-            }
-        )
-    }
 }
 
 @Composable

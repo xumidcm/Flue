@@ -7,6 +7,8 @@ package com.flue.launcher.ui.navigation
 enum class ScreenState {
     /** 表盘/时钟界面 */
     Face,
+    /** 表盘左侧负一屏 */
+    SideScreen,
     /** 应用列表（蜂窝或列表视图） */
     Apps,
     /** 单个应用内部视图 */
