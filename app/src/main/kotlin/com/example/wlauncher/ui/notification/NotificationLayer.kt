@@ -32,12 +32,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -164,17 +162,15 @@ fun NotificationLayer(
                     contentPadding = PaddingValues(bottom = 12.dp)
                 ) {
                     items(notificationGroups, key = { it.packageName }) { group ->
-                        Box(modifier = Modifier.animateItemPlacement()) {
-                            NotificationGroupBlock(
-                                group = group,
-                                revealedNotificationTarget = revealedNotificationTarget,
-                                onRevealTargetChange = onRevealTargetChange,
-                                onToggleGroup = { onToggleGroup(group.packageName) },
-                                onDismissGroup = { onDismissGroup(group.packageName) },
-                                onDismissNotification = onDismissNotification,
-                                onOpenNotification = onOpenNotification
-                            )
-                        }
+                        NotificationGroupBlock(
+                            group = group,
+                            revealedNotificationTarget = revealedNotificationTarget,
+                            onRevealTargetChange = onRevealTargetChange,
+                            onToggleGroup = { onToggleGroup(group.packageName) },
+                            onDismissGroup = { onDismissGroup(group.packageName) },
+                            onDismissNotification = onDismissNotification,
+                            onOpenNotification = onOpenNotification
+                        )
                     }
                 }
             }
@@ -285,7 +281,7 @@ private fun CollapsedGroupCard(group: NotificationGroupUi, onClick: () -> Unit) 
         repeat(minOf(group.hiddenCount, 2)) { index ->
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxWidth()
                     .padding(top = ((index + 1) * 6).dp, start = 8.dp, end = 8.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(Color(0xFF2B2B2B))
